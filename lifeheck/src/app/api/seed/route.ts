@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { createClient } from '@libsql/client'
 import prisma from '@/lib/prisma'
 
 const DEFAULTS = [
@@ -78,7 +79,76 @@ const DEFAULTS = [
   },
 ]
 
+async function ensureSchema() {
+  const db = createClient({
+    url: process.env.TURSO_DATABASE_URL ?? 'file:dev.db',
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  })
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS "Category" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "name" TEXT NOT NULL,
+      "icon" TEXT NOT NULL DEFAULT '',
+      "color" TEXT NOT NULL DEFAULT '#6366f1',
+      "isDefault" INTEGER NOT NULL DEFAULT 0,
+      "sortOrder" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS "Task" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "categoryId" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "description" TEXT NOT NULL DEFAULT '',
+      "type" TEXT NOT NULL DEFAULT 'BINARY',
+      "unit" TEXT NOT NULL DEFAULT '',
+      "targetValue" REAL NOT NULL DEFAULT 0,
+      "reminderTime" TEXT,
+      "scheduledDays" TEXT NOT NULL DEFAULT '',
+      "isActive" INTEGER NOT NULL DEFAULT 1,
+      "isDefault" INTEGER NOT NULL DEFAULT 0,
+      "sortOrder" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Task_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `)
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS "DailyLog" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "taskId" TEXT NOT NULL,
+      "date" TEXT NOT NULL,
+      "completed" INTEGER NOT NULL DEFAULT 0,
+      "value" REAL,
+      "notes" TEXT,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "DailyLog_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `)
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "DailyLog_taskId_date_key"
+    ON "DailyLog"("taskId", "date")
+  `)
+
+  try {
+    await db.execute(`ALTER TABLE "Task" ADD COLUMN "scheduledDays" TEXT NOT NULL DEFAULT ''`)
+  } catch {
+    // column already exists — expected
+  }
+
+  await db.close()
+}
+
 export async function POST(_req: NextRequest) {
+  await ensureSchema()
+
   let created = 0
   let skipped = 0
 
