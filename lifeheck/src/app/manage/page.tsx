@@ -51,6 +51,7 @@ interface TaskFormState {
   unit: string
   targetValue: string
   reminderTime: string
+  scheduledDays: string
 }
 
 const EMPTY_TASK: TaskFormState = {
@@ -60,6 +61,31 @@ const EMPTY_TASK: TaskFormState = {
   unit: '',
   targetValue: '',
   reminderTime: '',
+  scheduledDays: '',
+}
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function toggleDay(scheduledDays: string, day: number): string {
+  const days = scheduledDays ? scheduledDays.split(',').map(Number) : []
+  const idx = days.indexOf(day)
+  if (idx >= 0) {
+    days.splice(idx, 1)
+  } else {
+    days.push(day)
+    days.sort((a, b) => a - b)
+  }
+  return days.join(',')
+}
+
+function formatScheduledDays(sd: string): string {
+  if (!sd) return 'Every day'
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const nums = sd.split(',').map(Number)
+  if (nums.length === 7) return 'Every day'
+  if (nums.length === 5 && [1, 2, 3, 4, 5].every((d) => nums.includes(d))) return 'Weekdays'
+  if (nums.length === 2 && nums.includes(0) && nums.includes(6)) return 'Weekends'
+  return nums.map((n) => names[n]).join(', ')
 }
 
 function CategoryForm({
@@ -233,6 +259,33 @@ function TaskForm({
         </div>
       )}
 
+      <div>
+        <label className="text-xs text-[#8888a0] mb-1.5 block">
+          Schedule <span className="text-[#4e4e60]">(none = every day)</span>
+        </label>
+        <div className="flex gap-1 flex-wrap">
+          {DAY_LABELS.map((label, day) => {
+            const active = form.scheduledDays
+              ? form.scheduledDays.split(',').map(Number).includes(day)
+              : false
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => set('scheduledDays', toggleDay(form.scheduledDays, day))}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  active
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-[#1a1a1f] border border-[#2e2e35] text-[#8888a0] hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <button
           type="submit"
@@ -324,6 +377,7 @@ export default function ManagePage() {
         unit: data.unit,
         targetValue: parseFloat(data.targetValue) || 0,
         reminderTime: data.reminderTime,
+        scheduledDays: data.scheduledDays,
       }),
     })
     setAddingTaskTo(null)
@@ -341,6 +395,7 @@ export default function ManagePage() {
         unit: data.unit,
         targetValue: parseFloat(data.targetValue) || 0,
         reminderTime: data.reminderTime,
+        scheduledDays: data.scheduledDays,
       }),
     })
     setEditingTask(null)
@@ -361,6 +416,7 @@ export default function ManagePage() {
       unit: task.unit,
       targetValue: task.targetValue ? String(task.targetValue) : '',
       reminderTime: task.reminderTime,
+      scheduledDays: task.scheduledDays ?? '',
     }
   }
 

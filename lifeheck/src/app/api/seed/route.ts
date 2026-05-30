@@ -3,45 +3,94 @@ import prisma from '@/lib/prisma'
 
 const DEFAULTS = [
   {
-    name: 'Health & Fitness',
+    name: '🚭 Avoid / Limit',
+    icon: 'shield',
+    color: '#ef4444',
+    tasks: [
+      { name: 'Cigarettes / Vapes', type: 'QUANTITATIVE', unit: 'cigarettes', targetValue: 0, description: 'How many did you smoke today?' },
+      { name: 'Alcohol', type: 'QUANTITATIVE', unit: 'drinks', targetValue: 0, description: 'How many drinks today?' },
+      { name: 'Junk Food', type: 'QUANTITATIVE', unit: 'treats', targetValue: 0, description: 'Junk food / sweet treats count' },
+      { name: 'Social Media', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 30, description: 'Doomscrolling / screen time' },
+      { name: 'No Late Screen', type: 'BINARY', description: 'Devices off by 11 PM' },
+    ],
+  },
+  {
+    name: '🏋️ Health & Fitness',
     icon: 'dumbbell',
     color: '#22c55e',
     tasks: [
-      { name: 'Gym', type: 'BINARY', description: 'Workout session' },
-      { name: 'Walk', type: 'QUANTITATIVE', unit: 'steps', targetValue: 8000, description: 'Daily steps' },
-      { name: 'Protein Intake', type: 'QUANTITATIVE', unit: 'grams', targetValue: 150, description: 'Daily protein goal' },
-      { name: 'Calorie Deficit', type: 'QUANTITATIVE', unit: 'kcal', targetValue: 500, description: 'Calorie deficit target' },
+      { name: 'Gym', type: 'BINARY', description: 'Resistance training session' },
+      { name: 'Walk', type: 'QUANTITATIVE', unit: 'steps', targetValue: 8000 },
+      { name: 'Protein Intake', type: 'QUANTITATIVE', unit: 'grams', targetValue: 150 },
+      { name: 'Calorie Deficit', type: 'QUANTITATIVE', unit: 'kcal', targetValue: 500 },
+      { name: 'Water Intake', type: 'QUANTITATIVE', unit: 'liters', targetValue: 2.5 },
+      { name: 'Stretching', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 15, description: 'Yoga or mobility' },
+      { name: 'Cardio', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 30, description: 'Running/cycling' },
     ],
   },
   {
-    name: 'Work & Productivity',
+    name: '💼 Work & Productivity',
     icon: 'briefcase',
     color: '#3b82f6',
     tasks: [
-      { name: 'Deep Work', type: 'QUANTITATIVE', unit: 'hours', targetValue: 4, description: 'Focused work sessions' },
-      { name: 'Inbox Zero', type: 'BINARY', description: 'Clear all emails' },
-      { name: 'Standup', type: 'BINARY', description: 'Daily standup meeting' },
+      { name: 'Deep Work', type: 'QUANTITATIVE', unit: 'hours', targetValue: 4 },
+      { name: 'Inbox Zero', type: 'BINARY' },
+      { name: 'Standup', type: 'BINARY', description: 'Daily standup / planning' },
+      { name: 'Skill Learning', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 30, description: 'Coding / language courses' },
+      { name: 'Networking', type: 'BINARY', description: 'Reach out to contacts' },
+      { name: 'Documentation', type: 'BINARY', description: 'Daily logs / reports' },
     ],
   },
   {
-    name: 'Habits',
+    name: '🧠 Mental Health',
     icon: 'sparkles',
     color: '#a855f7',
     tasks: [
-      { name: 'Reading', type: 'QUANTITATIVE', unit: 'pages', targetValue: 20, description: 'Daily reading goal' },
-      { name: 'Meditation', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 10, description: 'Mindfulness practice' },
+      { name: 'Meditation', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 10 },
+      { name: 'Journaling', type: 'BINARY', description: 'Write thoughts / reflections' },
+      { name: 'Gratitude', type: 'BINARY', description: 'List 3 things grateful for' },
+      { name: 'Therapy / Reflection', type: 'BINARY', description: 'Mental check-in' },
+      { name: 'Breathing Exercises', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 5 },
+    ],
+  },
+  {
+    name: '🏡 Home & Life',
+    icon: 'home',
+    color: '#f59e0b',
+    tasks: [
+      { name: 'Quick Tidy', type: 'BINARY', description: '15-min daily reset of space' },
+      { name: 'Meal Prep', type: 'BINARY', description: 'Cook healthy options ahead' },
+      { name: 'Financial Log', type: 'BINARY', description: 'Log expenses for the day' },
+      { name: 'Plant / Pet Care', type: 'BINARY', description: 'Water plants / feed pets' },
+      { name: 'Chores', type: 'BINARY', description: 'Rotational household tasks' },
+    ],
+  },
+  {
+    name: '📚 Personal Growth',
+    icon: 'book',
+    color: '#14b8a6',
+    tasks: [
+      { name: 'Reading', type: 'QUANTITATIVE', unit: 'pages', targetValue: 20 },
+      { name: 'Gaming', type: 'QUANTITATIVE', unit: 'hours', targetValue: 2, description: 'Intentional gaming session' },
+      { name: 'Creative Project', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 30, description: 'Writing / art / passion project' },
+      { name: 'Podcast / Audiobook', type: 'QUANTITATIVE', unit: 'minutes', targetValue: 20, description: 'During commute / passive time' },
     ],
   },
 ]
 
 export async function POST(_req: NextRequest) {
-  const existing = await prisma.category.count()
-  if (existing > 0) {
-    return Response.json({ message: 'Already seeded' }, { status: 200 })
-  }
+  let created = 0
+  let skipped = 0
 
   for (let ci = 0; ci < DEFAULTS.length; ci++) {
     const cat = DEFAULTS[ci]
+    const existing = await prisma.category.findFirst({ where: { name: cat.name } })
+
+    if (existing) {
+      skipped++
+      continue
+    }
+
     const category = await prisma.category.create({
       data: {
         name: cat.name,
@@ -59,15 +108,17 @@ export async function POST(_req: NextRequest) {
           categoryId: category.id,
           name: t.name,
           type: t.type,
-          unit: 'unit' in t ? t.unit ?? '' : '',
-          targetValue: 'targetValue' in t ? t.targetValue ?? 0 : 0,
-          description: t.description,
+          unit: 'unit' in t ? (t.unit ?? '') : '',
+          targetValue: 'targetValue' in t ? (t.targetValue ?? 0) : 0,
+          description: 'description' in t ? (t.description ?? '') : '',
           isDefault: true,
           sortOrder: ti,
         },
       })
     }
+
+    created++
   }
 
-  return Response.json({ message: 'Seeded successfully' }, { status: 201 })
+  return Response.json({ created, skipped }, { status: 201 })
 }

@@ -22,6 +22,7 @@ export interface Task {
   unit: string
   targetValue: number
   reminderTime: string
+  scheduledDays: string
   isActive: boolean
   isDefault: boolean
   sortOrder: number

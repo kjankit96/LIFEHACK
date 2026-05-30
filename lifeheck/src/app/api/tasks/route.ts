@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     unit = '',
     targetValue = 0,
     reminderTime = '',
+    scheduledDays = '',
   } = body
 
   if (!categoryId || !name?.trim()) {
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       unit,
       targetValue: Number(targetValue),
       reminderTime,
+      scheduledDays,
       sortOrder: count,
     },
     include: { category: true },

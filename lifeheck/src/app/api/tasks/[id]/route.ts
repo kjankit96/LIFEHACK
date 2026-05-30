@@ -7,7 +7,7 @@ export async function PUT(
 ) {
   const { id } = await params
   const body = await req.json()
-  const { name, description, type, unit, targetValue, reminderTime, isActive, categoryId } = body
+  const { name, description, type, unit, targetValue, reminderTime, scheduledDays, isActive, categoryId } = body
 
   const task = await prisma.task.update({
     where: { id },
@@ -18,6 +18,7 @@ export async function PUT(
       ...(unit !== undefined && { unit }),
       ...(targetValue !== undefined && { targetValue: Number(targetValue) }),
       ...(reminderTime !== undefined && { reminderTime }),
+      ...(scheduledDays !== undefined && { scheduledDays }),
       ...(isActive !== undefined && { isActive }),
       ...(categoryId !== undefined && { categoryId }),
     },

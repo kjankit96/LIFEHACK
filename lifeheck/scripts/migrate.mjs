@@ -56,12 +56,19 @@ const statements = [
     ON "DailyLog"("taskId", "date")`,
 ]
 
-console.log(`Applying schema to: ${url.replace(/^libsql:\/\//, '').split('.')[0]}`)
+console.log(`Applying schema to: ${url.replace(/^libsql:\/\//, '').split('.')[0] || url}`)
 
 for (const sql of statements) {
   await client.execute(sql)
   const name = sql.match(/"(\w+)"/)?.[1] ?? '?'
   console.log(`  ✓ ${name}`)
+}
+
+try {
+  await client.execute(`ALTER TABLE "Task" ADD COLUMN "scheduledDays" TEXT NOT NULL DEFAULT ''`)
+  console.log('  ✓ Task.scheduledDays column added')
+} catch {
+  // column already exists, that's fine
 }
 
 console.log('Schema applied.')
