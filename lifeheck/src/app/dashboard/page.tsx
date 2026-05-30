@@ -472,7 +472,18 @@ export default function DashboardPage() {
   useEffect(() => {
     async function init() {
       if (!seeded) {
-        await fetch('/api/seed', { method: 'POST' })
+        try {
+          const res = await fetch('/api/seed', { method: 'POST' })
+          if (!res.ok) {
+            const body = await res.text()
+            console.error('[seed] HTTP', res.status, body)
+          } else {
+            const body = await res.json()
+            if (body.errors?.length) console.error('[seed] partial errors:', body.errors)
+          }
+        } catch (e) {
+          console.error('[seed] fetch failed:', e)
+        }
         setSeeded(true)
       }
       await load()

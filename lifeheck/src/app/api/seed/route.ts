@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@libsql/client'
 import prisma from '@/lib/prisma'
 
 const DEFAULTS = [
@@ -80,12 +79,7 @@ const DEFAULTS = [
 ]
 
 async function ensureSchema() {
-  const db = createClient({
-    url: process.env.TURSO_DATABASE_URL ?? 'file:dev.db',
-    authToken: process.env.TURSO_AUTH_TOKEN,
-  })
-
-  await db.execute(`
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Category" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "name" TEXT NOT NULL,
@@ -98,7 +92,7 @@ async function ensureSchema() {
     )
   `)
 
-  await db.execute(`
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Task" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "categoryId" TEXT NOT NULL,
@@ -118,7 +112,7 @@ async function ensureSchema() {
     )
   `)
 
-  await db.execute(`
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DailyLog" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "taskId" TEXT NOT NULL,
@@ -132,63 +126,63 @@ async function ensureSchema() {
     )
   `)
 
-  await db.execute(`
+  await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "DailyLog_taskId_date_key"
     ON "DailyLog"("taskId", "date")
   `)
 
   try {
-    await db.execute(`ALTER TABLE "Task" ADD COLUMN "scheduledDays" TEXT NOT NULL DEFAULT ''`)
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "Task" ADD COLUMN "scheduledDays" TEXT NOT NULL DEFAULT ''`
+    )
   } catch {
-    // column already exists — expected
+    // column already exists — expected on re-runs
   }
-
-  await db.close()
 }
 
 export async function POST(_req: NextRequest) {
-  await ensureSchema()
+  try {
+    await ensureSchema()
+  } catch (err) {
+    console.error('[seed] ensureSchema failed:', err)
+    return Response.json({ error: 'Schema migration failed', detail: String(err) }, { status: 500 })
+  }
 
   let created = 0
   let skipped = 0
+  const errors: string[] = []
 
   for (let ci = 0; ci < DEFAULTS.length; ci++) {
     const cat = DEFAULTS[ci]
-    const existing = await prisma.category.findFirst({ where: { name: cat.name } })
+    try {
+      const existing = await prisma.category.findFirst({ where: { name: cat.name } })
+      if (existing) { skipped++; continue }
 
-    if (existing) {
-      skipped++
-      continue
-    }
-
-    const category = await prisma.category.create({
-      data: {
-        name: cat.name,
-        icon: cat.icon,
-        color: cat.color,
-        isDefault: true,
-        sortOrder: ci,
-      },
-    })
-
-    for (let ti = 0; ti < cat.tasks.length; ti++) {
-      const t = cat.tasks[ti]
-      await prisma.task.create({
-        data: {
-          categoryId: category.id,
-          name: t.name,
-          type: t.type,
-          unit: 'unit' in t ? (t.unit ?? '') : '',
-          targetValue: 'targetValue' in t ? (t.targetValue ?? 0) : 0,
-          description: 'description' in t ? (t.description ?? '') : '',
-          isDefault: true,
-          sortOrder: ti,
-        },
+      const category = await prisma.category.create({
+        data: { name: cat.name, icon: cat.icon, color: cat.color, isDefault: true, sortOrder: ci },
       })
-    }
 
-    created++
+      for (let ti = 0; ti < cat.tasks.length; ti++) {
+        const t = cat.tasks[ti]
+        await prisma.task.create({
+          data: {
+            categoryId: category.id,
+            name: t.name,
+            type: t.type,
+            unit: 'unit' in t ? (t.unit ?? '') : '',
+            targetValue: 'targetValue' in t ? (t.targetValue ?? 0) : 0,
+            description: 'description' in t ? (t.description ?? '') : '',
+            isDefault: true,
+            sortOrder: ti,
+          },
+        })
+      }
+      created++
+    } catch (err) {
+      console.error(`[seed] failed on category "${cat.name}":`, err)
+      errors.push(`${cat.name}: ${String(err)}`)
+    }
   }
 
-  return Response.json({ created, skipped }, { status: 201 })
+  return Response.json({ created, skipped, errors }, { status: 201 })
 }
